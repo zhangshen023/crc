@@ -58,6 +58,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.*;
+import static reactor.netty.Test.intToByteArray;
 import static reactor.netty.tcp.TcpClientTests.FrameStatus.FRAME_32;
 
 /**
@@ -107,15 +108,7 @@ public class TcpClientTests {
         }
     }
 
-    public static byte[] intToByteArray(int i) {
-        byte[] result = new byte[4];
-        //由高位到低位
-        result[0] = (byte) ((i >> 24) & 0xFF);
-        result[1] = (byte) ((i >> 16) & 0xFF);
-        result[2] = (byte) ((i >> 8) & 0xFF);
-        result[3] = (byte) (i & 0xFF);
-        return result;
-    }
+
 
     @After
     public void cleanup() throws InterruptedException, IOException {
@@ -426,8 +419,8 @@ public class TcpClientTests {
                 o.sendByteArray(Flux.just(str2Byte())).then().subscribe().dispose();
 
                 //发送订单
-                byte[] equipNo = new byte[]{0x01, 0x02, 0x03, 0x04};
-                o.sendByteArray(Flux.just(sendOrder2Equip(equipNo, null))).then().subscribe().dispose();
+
+                o.sendByteArray(Flux.just(sendOrder2Equip())).then().subscribe().dispose();
 
                 o.sendObject(Mono.never()
                         .doOnCancel(connectionLatch::countDown)
@@ -464,43 +457,30 @@ public class TcpClientTests {
      * @param equipNo 4个字节
      * @return
      */
-    public static byte[] sendOrder2Equip(byte[] equipNo, String orderNo) {
+    public static byte[] sendOrder2Equip() {
         List<Byte> msg = new ArrayList<>();
-        List<Byte> realMsg = new ArrayList<>();
         //发送帧头1
         msg.add((byte) 0xAA);
         //发送帧头2
         msg.add((byte) 0x55);
         //版本号
         msg.add((byte) 0x01);
-        realMsg.add((byte) 0x01);
         //数据长度
         msg.add((byte) 0x19);
-        realMsg.add((byte) 0x19);
         //命令
         msg.add(FRAME_32.getOrder());
-        realMsg.add(FRAME_32.getOrder());
         //设备编号
+        byte[] equipNo = new byte[]{0x01, 0x02, 0x03, 0x04};
         msg.addAll(Bytes.asList(equipNo));
-        realMsg.addAll(Bytes.asList(equipNo));
         //订单选项
         msg.add((byte) 0x01);
-        realMsg.add((byte) 0x01);
         byte[] orderBytes = "201807080938187791924059".getBytes(Charset.forName("utf-8"));
         msg.addAll(Bytes.asList(orderBytes));
-        realMsg.addAll(Bytes.asList(orderBytes));
         //CRC_H CRC_L
-//        CRC16M crc16M = new CRC16M();
-//        crc16M.update(Bytes.toArray(realMsg), realMsg.size());
-
-
-        realMsg.addAll(Bytes.asList(intToByteArray(CRC16M.GetCrc16(Bytes.toArray(realMsg)))));
-
-        realMsg.addAll(0, msg.subList(0, 2));
+        msg.addAll(Bytes.asList(intToByteArray(reactor.netty.Test.GetCrc16(Bytes.toArray(msg.subList(2, msg.size()))))));
         //帧尾
         msg.add((byte) (0xFE));
-        realMsg.add((byte) (0xFE));
-        return Bytes.toArray(realMsg);
+        return Bytes.toArray(msg);
     }
 
     public enum EquipStatus {
