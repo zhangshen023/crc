@@ -466,29 +466,41 @@ public class TcpClientTests {
      */
     public static byte[] sendOrder2Equip(byte[] equipNo, String orderNo) {
         List<Byte> msg = new ArrayList<>();
+        List<Byte> realMsg = new ArrayList<>();
         //发送帧头1
+        msg.add((byte) 0xAA);
         //发送帧头2
+        msg.add((byte) 0x55);
         //版本号
         msg.add((byte) 0x01);
+        realMsg.add((byte) 0x01);
         //数据长度
         msg.add((byte) 0x19);
+        realMsg.add((byte) 0x19);
         //命令
         msg.add(FRAME_32.getOrder());
+        realMsg.add(FRAME_32.getOrder());
         //设备编号
         msg.addAll(Bytes.asList(equipNo));
+        realMsg.addAll(Bytes.asList(equipNo));
         //订单选项
         msg.add((byte) 0x01);
+        realMsg.add((byte) 0x01);
         byte[] orderBytes = "201807080938187791924059".getBytes(Charset.forName("utf-8"));
         msg.addAll(Bytes.asList(orderBytes));
+        realMsg.addAll(Bytes.asList(orderBytes));
         //CRC_H CRC_L
-        CRC16M crc16M = new CRC16M();
-        crc16M.update(Bytes.toArray(msg), Bytes.toArray(msg).length);
-        msg.addAll(Bytes.asList(intToByteArray(crc16M.getValue())));
+//        CRC16M crc16M = new CRC16M();
+//        crc16M.update(Bytes.toArray(realMsg), realMsg.size());
+
+
+        realMsg.addAll(Bytes.asList(intToByteArray(CRC16M.GetCrc16(Bytes.toArray(realMsg)))));
+
+        realMsg.addAll(0, msg.subList(0, 2));
         //帧尾
         msg.add((byte) (0xFE));
-        msg.add(0,(byte) 0x55);
-        msg.add(0,(byte) 0xAA);
-        return Bytes.toArray(msg);
+        realMsg.add((byte) (0xFE));
+        return Bytes.toArray(realMsg);
     }
 
     public enum EquipStatus {
