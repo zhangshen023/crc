@@ -109,7 +109,6 @@ public class TcpClientTests {
     }
 
 
-
     @After
     public void cleanup() throws InterruptedException, IOException {
         echoServer.close();
@@ -458,29 +457,41 @@ public class TcpClientTests {
      * @return
      */
     public static byte[] sendOrder2Equip() {
-        List<Byte> msg = new ArrayList<>();
+        byte[] msg = new byte[37];
         //发送帧头1
-        msg.add((byte) 0xAA);
+        int pos = 0;
+        msg[pos++] = (byte) 0xAA;
         //发送帧头2
-        msg.add((byte) 0x55);
+        msg[pos++] = (byte) 0x55;
         //版本号
-        msg.add((byte) 0x01);
+        msg[pos++] = (byte) 0x01;
         //数据长度
-        msg.add((byte) 0x19);
+        msg[pos++] = (byte) 0x19;
         //命令
-        msg.add(FRAME_32.getOrder());
+        msg[pos++] = FRAME_32.getOrder();
         //设备编号
-        byte[] equipNo = new byte[]{0x01, 0x02, 0x03, 0x04};
-        msg.addAll(Bytes.asList(equipNo));
+        byte[] equipNo = new byte[]{(byte) 0x01, (byte) 0x02, (byte) 0x03, (byte) 0x04};
+        int tmpPos = 0;
+        while (tmpPos < 4) {
+            msg[pos++] = equipNo[tmpPos++];
+        }
         //订单选项
-        msg.add((byte) 0x01);
+        msg[pos++] = (byte) 0x01;
         byte[] orderBytes = "201807080938187791924059".getBytes(Charset.forName("utf-8"));
-        msg.addAll(Bytes.asList(orderBytes));
+        tmpPos = 0;
+        while (tmpPos < 24) {
+            msg[pos++] = orderBytes[tmpPos++];
+        }
         //CRC_H CRC_L
-        msg.addAll(Bytes.asList(intToByteArray(reactor.netty.Test.GetCrc16(Bytes.toArray(msg.subList(2, msg.size()))))));
+        tmpPos = 2;
+        byte[] tempByteArray2Crc = Arrays.copyOfRange(msg, 2, 33);
+        byte[] crcValue = intToByteArray(CRC8.getcrc(tempByteArray2Crc));
+        while (tmpPos < 4) {
+            msg[pos++] = crcValue[tmpPos++];
+        }
         //帧尾
-        msg.add((byte) (0xFE));
-        return Bytes.toArray(msg);
+        msg[pos++] = ((byte) (0xFE));
+        return msg;
     }
 
     public enum EquipStatus {
