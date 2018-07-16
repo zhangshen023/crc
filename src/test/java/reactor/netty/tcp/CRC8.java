@@ -1,5 +1,14 @@
 package reactor.netty.tcp;
 
+import com.google.common.primitives.Bytes;
+import reactor.netty.Test;
+
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
+
+import static reactor.netty.tcp.TcpClientTests.FrameStatus.FRAME_32;
+
 public class CRC8 {
 
     static final byte[] crc_array_h = {(byte) 0x00, (byte) 0xC1, (byte) 0x81, (byte) 0x40, (byte) 0x01, (byte) 0xC0, (byte) 0x80,
@@ -87,6 +96,9 @@ public class CRC8 {
         System.out.println("低位 high：" + high);
         System.out.println("低位 high：" + Integer.toBinaryString(high));
         System.out.println("---------------------------------");
+
+
+        System.out.println(getcrc(String.valueOf(new char[]{'1'}).getBytes("utf-8")));
     }
 
     public static int getcrc(byte[] crcdata) {
@@ -120,5 +132,44 @@ public class CRC8 {
         bytes[2] = (byte) ((num >> 8) & 0xff);
         bytes[3] = (byte) (num & 0xff);
         return bytes;
+    }
+
+    /**
+     * @return
+     */
+    public static byte[] sendOrder2Equip() {
+        List<Byte> msg = new ArrayList<>();
+        //发送帧头1
+        msg.add((byte) 0xAA);
+        //发送帧头2
+        msg.add((byte) 0x55);
+        //版本号
+        msg.add((byte) 0x01);
+        //数据长度
+        msg.add((byte) 0x19);
+        //命令
+        msg.add(FRAME_32.getOrder());
+        //设备编号
+        byte[] equipNo = new byte[]{0x01, 0x02, 0x03, 0x04};
+        msg.addAll(Bytes.asList(equipNo));
+        //订单选项
+        msg.add((byte) 0x01);
+        byte[] orderBytes = "201807080938187791924059".getBytes(Charset.forName("utf-8"));
+        msg.addAll(Bytes.asList(orderBytes));
+        //CRC_H CRC_L
+        msg.addAll(Bytes.asList(intToByteArray(Test.GetCrc16(Bytes.toArray(msg.subList(2, msg.size()))))));
+        //帧尾
+        msg.add((byte) (0xFE));
+        return Bytes.toArray(msg);
+    }
+
+    public static byte[] intToByteArray(int i) {
+        byte[] result = new byte[4];
+        //由高位到低位
+        result[0] = (byte) ((i >> 24) & 0xFF);
+        result[1] = (byte) ((i >> 16) & 0xFF);
+        result[2] = (byte) ((i >> 8) & 0xFF);
+        result[3] = (byte) (i & 0xFF);
+        return result;
     }
 }

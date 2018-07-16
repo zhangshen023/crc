@@ -16,7 +16,6 @@
 
 package reactor.netty.tcp;
 
-import com.google.common.primitives.Bytes;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.codec.LineBasedFrameDecoder;
 import org.assertj.core.api.Assertions;
@@ -421,27 +420,6 @@ public class TcpClientTests {
 
                 o.sendByteArray(Flux.just(sendOrder2Equip())).then().subscribe().dispose();
 
-                o.sendObject(Mono.never()
-                        .doOnCancel(connectionLatch::countDown)
-                        .log("uno"))
-                        .then()
-                        .subscribe()
-                        .dispose();
-
-                Schedulers.parallel()
-                        .schedule(() -> o.sendObject(Mono.never()
-                                .doOnCancel(connectionLatch::countDown)
-                                .log("dos"))
-                                .then()
-                                .subscribe()
-                                .dispose());
-
-                o.sendObject(Mono.never()
-                        .doOnCancel(connectionLatch::countDown)
-                        .log("tres"))
-                        .then()
-                        .subscribe()
-                        .dispose();
 
                 return Mono.never();
             }
@@ -454,7 +432,7 @@ public class TcpClientTests {
 
     /**
      * @param equipNo 4个字节
-     * @return
+     * @return 发送订单到设备服务器
      */
     public static byte[] sendOrder2Equip() {
         byte[] msg = new byte[37];
@@ -484,15 +462,42 @@ public class TcpClientTests {
         }
         //CRC_H CRC_L
         tmpPos = 2;
-        byte[] tempByteArray2Crc = Arrays.copyOfRange(msg, 2, 33);
+        byte[] tempByteArray2Crc = Arrays.copyOfRange(msg, 2, 34);
+        System.out.println("test len:" + tempByteArray2Crc.length);
         byte[] crcValue = intToByteArray(CRC8.getcrc(tempByteArray2Crc));
-        while (tmpPos < 4) {
-            msg[pos++] = crcValue[tmpPos++];
-        }
+        System.out.println(CRC8.getcrc(tempByteArray2Crc));
+//        System.out.println("二进制校验值:", Integer.toBinaryString(CRC8.getcrc(tempByteArray2Crc));
+        msg[pos++] = crcValue[3];
+        msg[pos++] = crcValue[2];
+        System.out.println("二进制校验值：" + bytesToHexFun2(new byte[]{crcValue[2]}) + "," + bytesToHexFun2(new byte[]{crcValue[3]}));
+        //while (tmpPos < 4) {
+        //    msg[pos++] = crcValue[tmpPos++];
+        // }
         //帧尾
         msg[pos++] = ((byte) (0xFE));
         return msg;
     }
+
+    /**
+     * 方法二：
+     * byte[] to hex string
+     *
+     * @param bytes
+     * @return
+     */
+    public static String bytesToHexFun2(byte[] bytes) {
+        char[] buf = new char[bytes.length * 2];
+        int index = 0;
+        for (byte b : bytes) { // 利用位运算进行转换，可以看作方法一的变种
+            buf[index++] = HEX_CHAR[b >>> 4 & 0xf];
+            buf[index++] = HEX_CHAR[b & 0xf];
+        }
+
+        return new String(buf);
+    }
+
+    private static final char[] HEX_CHAR = {'0', '1', '2', '3', '4', '5',
+            '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
     public enum EquipStatus {
         PROD,
