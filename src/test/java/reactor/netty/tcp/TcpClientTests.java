@@ -28,7 +28,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.Connection;
-import reactor.netty.NettyInbound;
 import reactor.netty.NettyOutbound;
 import reactor.netty.SocketUtils;
 import reactor.netty.channel.AbortedException;
@@ -50,7 +49,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -410,31 +408,37 @@ public class TcpClientTests {
                         .port(9001);
         Connection c;
 
-        c = tcpClient.handle(new BiFunction<NettyInbound, NettyOutbound, Publisher<Void>>() {
-            @Override
-            public Publisher<Void> apply(NettyInbound i, NettyOutbound o) {
+        c = tcpClient.handle((i, o) -> {
 
-                o.sendByteArray(Flux.just(str2Byte())).then().subscribe().dispose();
+            o.sendByteArray(Flux.just(str2Byte()))
+                    .then()
+                    .subscribe(new Consumer<Void>() {
+                        @Override
+                        public void accept(Void aVoid) {
+                            //发送订单
+                            o.sendByteArray(Flux.just(sendOrder2Equip(new byte[]{(byte) 0x01, (byte) 0x02, (byte) 0x03, (byte) 0x04}
+                                    , "201807080938187791924059")))
+                                    .then()
+                                    .subscribe()
+                                    .dispose();
+                        }
+                    })
+                    .dispose();
 
-                //发送订单
 
-                o.sendByteArray(Flux.just(sendOrder2Equip())).then().subscribe().dispose();
+            return Mono.never();
+        }).connectNow();
 
-
-                return Mono.never();
-            }
-        })
-                .connectNow();
-
-        assertTrue("Cancel not propagated", connectionLatch.await(30, TimeUnit.SECONDS));
+        Thread.sleep(4000);
         c.dispose();
     }
 
     /**
-     * @param equipNo 4个字节
+     * @param equipNo 4个字节 new byte[]{(byte) 0x01, (byte) 0x02, (byte) 0x03, (byte) 0x04}
+     * @param orderNo 订单号 "201807080938187791924059"
      * @return 发送订单到设备服务器
      */
-    public static byte[] sendOrder2Equip() {
+    public static byte[] sendOrder2Equip(byte[] equipNo, String orderNo) {
         byte[] msg = new byte[37];
         //发送帧头1
         int pos = 0;
@@ -448,7 +452,6 @@ public class TcpClientTests {
         //命令
         msg[pos++] = FRAME_32.getOrder();
         //设备编号
-        byte[] equipNo = new byte[]{(byte) 0x01, (byte) 0x02, (byte) 0x03, (byte) 0x04};
         int tmpPos = 0;
         while (tmpPos < 4) {
             msg[pos++] = equipNo[tmpPos++];
@@ -691,7 +694,7 @@ public class TcpClientTests {
                         if (read > 0) {
                             buffer.flip();
                         }
-
+                        System.out.println("请求:" + buffer.toString());
                         int written = ch.write(buffer);
                         if (written < 0) {
                             throw new IOException("Cannot write to client");
